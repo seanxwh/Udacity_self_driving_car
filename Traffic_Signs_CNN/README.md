@@ -12,7 +12,7 @@
 
 Visualize the German Traffic Signs Dataset.
 
-to build the project from ground up, download the via <a href ="https://d17h27t6h515a5.cloudfront.net/topher/2016/November/581faac4_traffic-signs-data/traffic-signs-data.zip" >here</a> and put the unziped file in **./traffic-signs-data** folder
+to build the project from ground up, download the data via <a href ="https://d17h27t6h515a5.cloudfront.net/topher/2016/November/581faac4_traffic-signs-data/traffic-signs-data.zip" >here</a> and put the unziped file in **./traffic-signs-data** folder
 
 The pickled data is a dictionary with 4 key/value pairs:
 - features -> the images pixel values, (width, height, channels)
