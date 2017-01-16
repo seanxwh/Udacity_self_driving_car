@@ -50,6 +50,10 @@ x_test, y_test = test['features'], test['labels']
 ### a basic data summary.
 import random
 import numpy as np
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+
 # number of training examples
 n_train = len(x_train)
 
@@ -63,17 +67,54 @@ image_shape = list(choosen_image.shape)
 
 # the unique classes are in the dataset, they can be found by applying them to a set
 n_classes = len(set(y_train))
-
+classes_ary_train = [0 for _ in range(n_classes)]
+for i in y_train:
+    classes_ary_train[i] += 1  
+classes_ary_test = [0 for _ in range(n_classes)]
+for i in y_test:
+    classes_ary_test[i] += 1 
+    
 print("Number of training examples =", n_train)
 print("Number of testing examples =", n_test)
 print("Image data shape =", image_shape)
 print("Number of classes =", n_classes)
+
+fig = plt.figure()
+fig.add_subplot()
+print("\n Classes Histrogram(# example/traffic sign) of the train set")
+plt.bar(list(range(n_classes)), height=classes_ary_train)
+plt.xticks(list(range(n_classes)), fontsize = 6)
+plt.ylabel('number of examples')
+plt.xlabel('traffic sign number (training)')
+plt.show()
+
+fig.add_subplot()
+print("\n Classes Histrogram(# example/traffic sign) of the test set")
+plt.bar(list(range(n_classes)), height=classes_ary_test)
+plt.xticks(list(range(n_classes)), fontsize = 6)
+plt.ylabel('number of examples')
+plt.xlabel('traffic sign number (testing)')
+plt.show()
 ```
 
     Number of training examples = 39209
     Number of testing examples = 12630
     Image data shape = [32, 32, 3]
     Number of classes = 43
+    
+     Classes Histrogram(# example/traffic sign) of the train set
+    
+
+
+![png](output_3_1.png)
+
+
+    
+     Classes Histrogram(# example/traffic sign) of the test set
+    
+
+
+![png](output_3_3.png)
 
 
 
@@ -89,8 +130,8 @@ print('This image is:', sign_names[y_train[choosen_idx]])
 
 ```
 
-    This image is: Yield
-
+    This image is: Speed limit (20km/h)
+    
 
 
 ![png](output_4_1.png)
@@ -260,7 +301,7 @@ print("test size", len(test_data))
     train size 34048
     validation size 5120
     test size 12544
-
+    
 
 #### DataSets class 
 
@@ -436,7 +477,7 @@ class Batch(object):
 
 ```
 
----
+----
 #### Utilitis for placeholder  
 
 
@@ -505,10 +546,6 @@ def fill_feed_dict(inputs, placeholders):
 ```python
 import time
 import tensorflow
-from functools import reduce
-
-
-
 
 def evaluation(logits, labels):
     accuracy = tf.nn.in_top_k(logits, labels, 1)
@@ -673,8 +710,7 @@ def train(loss, learning_rate):
 
 
 def run_training(continue_training=True, load_model=False):
-#     tf.reset_default_graph()
-#     print (continue_training, load_model)
+
     with tf.Graph().as_default():
         images_placeholder, labels_placeholder = placeholder_inputs(FLAGS.batch_size)
 
@@ -692,26 +728,23 @@ def run_training(continue_training=True, load_model=False):
 
         summary = tf.summary.merge_all()
 
-        saver = tf.train.Saver(tf.global_variables())
-
         init = tf.global_variables_initializer()
 
         sess = tf.Session()
 
-        summary_writer = tf.summary.FileWriter(FLAGS.input_data_dir, sess.graph)
-
+        summary_writer = tf.summary.FileWriter(FLAGS.graph_dir, sess.graph)
+        
         sess.run(init)
+        
+        saver = tf.train.Saver(tf.global_variables()) if not load_model else tf.train.Saver()
 
         if load_model:
             
-            new_saver = tf.train.import_meta_graph(FLAGS.log_dir+'/model.ckpt-59.meta')
-
-            new_saver.restore(sess, tf.train.latest_checkpoint(FLAGS.log_dir))
-
+            saver.restore(sess, tf.train.latest_checkpoint(FLAGS.log_dir))
 
         if continue_training:
             
-            for step in range(FLAGS.max_epoches):
+            for ep in range(FLAGS.max_epoches):
 
                 data_set = data_sets.train
 
@@ -731,13 +764,13 @@ def run_training(continue_training=True, load_model=False):
 
                 duration = time.time() - start_time
 
-                print('epoch %d: loss = %.2f (%.3f sec)' % (step, loss_val, duration))
+                print('epoch %d: loss = %.2f (%.3f sec)' % (ep, loss_val, duration))
 
                 summary_str = sess.run(summary, feed_dict=feed_dict)
                 summary_writer.add_summary(summary_str, step)
                 summary_writer.flush()
 
-                if step % 2 == 0:
+                if ep % 2 == 0:
                     print('Validation Data Eval:')
                     do_eval(sess,
                             eval_accuracy,
@@ -746,7 +779,7 @@ def run_training(continue_training=True, load_model=False):
                             FLAGS)
 
 
-                if (step + 1) % FLAGS.save_steps == 0 or (step + 1) == FLAGS.max_epoches:
+                if (ep + 1) % FLAGS.save_steps == 0 or (ep + 1) == FLAGS.max_epoches:
                     checkpoint_path = os.path.join(FLAGS.log_dir, 'model.ckpt')
                     saver.save(sess, checkpoint_path, global_step=step)
 
@@ -766,6 +799,8 @@ def run_training(continue_training=True, load_model=False):
                 placeholders,
                 data_sets.test,
                 FLAGS)
+        sess.close()
+
 ```
 
  ### Question 3
@@ -793,7 +828,8 @@ The network has two type of layers, and their specification is as follow:
 2. fully connected layers
     * fully_connected: taking the input from above(layer_4) and flatten the input($4*4*512$) and use that to feed into 768 fully connected neurons 
     * fully_connected_2: taking the input from above feed(768) into 1536 fully connected neurons
-    * final_output: taking the input from above and feed into 43(number of different signs) fully connected neurons
+    * final_output: taking the input from above and feed into 43(number of different signs) fully connected 
+![](CNN_graph.png)
 
 
 ### Question 4
@@ -805,9 +841,7 @@ _How did you train your model? (Type of optimizer, batch size, epochs, hyperpara
 * keep rate for the fully connected layers beside final layer : 0.5 
 * learning rate: 1e-4
 * batch size: 128
-* epoch: 60
-
-
+* epoch: 100
 
 #### CNN layers structure and hyperparameters
 
@@ -826,7 +860,7 @@ def main(_):
     print ("starting time: ",program_strart_time)
     
     # to restart the train process delete all parameters in run_training     
-    run_training(False, True)
+    run_training(False,True)
     
     program_end_time = time.time()
     print ("ending time: ", program_end_time)
@@ -903,9 +937,9 @@ parser.add_argument(
   help='keep probability for each dropout layer within the fully connected layes'
 )
 parser.add_argument(
-  '--input_data_dir',
+  '--graph_dir',
   type=str,
-  default='./data/input_data',
+  default='./graph/training',
   help='Directory to put the input data.'
 )
 parser.add_argument(
@@ -935,31 +969,27 @@ data_sets = DataSets(train_set, validation_set, test_set, FLAGS)
 
 # run the main function below  
 tf.app.run()
-
-
-
 ```
 
-    starting time:  1483478687.053826
-    here
+    starting time:  1484588337.4978368
     Training Data Eval:
     Num examples: 34048  Num correct: 34048  Precision @ 1: 1.0000
     Test Data Eval:
-    Num examples: 12544  Num correct: 12250  Precision @ 1: 0.9766
-    ending time:  1483479812.216478
-
+    Num examples: 12544  Num correct: 11956  Precision @ 1: 0.9531
+    ending time:  1484588360.2815783
+    
 
 
     An exception has occurred, use %tb to see the full traceback.
-
+    
 
     SystemExit
+    
 
 
-
-    /Users/seanhuang/anaconda3/lib/python3.5/site-packages/IPython/core/interactiveshell.py:2889: UserWarning: To exit: use 'exit', 'quit', or Ctrl-D.
+    C:\Users\hpc\AppData\Local\Continuum\Anaconda3\lib\site-packages\IPython\core\interactiveshell.py:2889: UserWarning: To exit: use 'exit', 'quit', or Ctrl-D.
       warn("To exit: use 'exit', 'quit', or Ctrl-D.", stacklevel=1)
-
+    
 
 ### Question 5
 _What approach did you take in coming up with a solution to this problem?_
@@ -971,7 +1001,7 @@ The following ways were the method I used to build the model
 
 
 
----
+----
 
 ## Step 3: Test a Model on New Images
 
@@ -1015,7 +1045,7 @@ def eval_pictures(pics_ary,k=1, FLAGS=FLAGS):
             val = val.eval(session=sess)
             indices = indices.eval(session=sess)
             if k==1:
-                pics_ary_classified.append(sign_names[indices[0]])
+                pics_ary_classified.append(sign_names[int(indices[0])])
             else:
                 pics_ary_classified.append((val, indices))
         sess.close()
@@ -1028,15 +1058,14 @@ def eval_pictures(pics_ary,k=1, FLAGS=FLAGS):
 
 ```python
 #block that used for ploting image with the classification result 
-def plot_graph_with_classify(all_img, classify_res):
+def plot_graph_with_classify(all_img, classify_res, real_res):
     import matplotlib.pyplot as plt
     %matplotlib inline
     fig = plt.figure()
     for idx in range(len(all_img)):
-
         fig.add_subplot(len(all_img), 1, idx+1)
         plt.axis('off')
-        plt.title(classify_res[idx], fontsize=8)
+        plt.title("classified as: "+classify_res[idx]+"     real result: "+real_res[idx], fontsize=8)
         plt.imshow(all_img[idx])
         plt.subplots_adjust(left=0.1, right=0.9, top=1.2, bottom=0.1)
 
@@ -1049,8 +1078,7 @@ _Choose five candidate images of traffic signs and provide them in the report. A
 
 
 **A:**
-we've randomly choosen 5 images from the training dataset, and the classification have predict the right result 
-
+we've randomly choosen 5 images from the training dataset, and the classification have predict the right result.One main reason is as we can see above the percision for evaluating the training data is one, which mean there is no error when using the model in training set, this can also mean we've overfit the model, since the testset is not perfectly classified as we can see below
 
 
 ```python
@@ -1062,15 +1090,14 @@ Q_6_five_random_imgs = [shuffled_train_data[idx] for idx in Q_6_five_random_idx]
 
 Q_6_classified_res = eval_pictures(Q_6_five_random_imgs)
 
-plot_graph_with_classify(Q_6_five_random_imgs, Q_6_classified_res)
+Q_6_real_res = list(map(lambda idx: sign_names[int(shuffled_train_labels[idx])], Q_6_five_random_idx))
+
+plot_graph_with_classify(Q_6_five_random_imgs, Q_6_classified_res , Q_6_real_res)
 
 ```
 
-    /Users/seanhuang/anaconda3/lib/python3.5/site-packages/ipykernel/__main__.py:38: VisibleDeprecationWarning: converting an array with ndim > 0 to an index will result in an error in the future
 
-
-
-![png](output_32_1.png)
+![png](output_33_0.png)
 
 
 ### Question 7
@@ -1079,7 +1106,7 @@ _Is your model able to perform equally well on captured pictures when compared t
 
 
 **A:**
-we randomly choose 5 images from the test dataset, and the classification have also predict the right result 
+we randomly choose 5 images from the test dataset. In the examples below, we can see the classifier have trouble classify the 4th image. One speculation for such issue is both corresponding signs have similar shape in the middle area, also the size of image is $32*32$ which limit detail within picture, all these resulting a wrong classification
 
 
 ```python
@@ -1091,14 +1118,13 @@ Q_7_five_random_imgs = [shuffled_test_data[idx] for idx in Q_7_five_random_idx]
 
 Q_7_classified_res = eval_pictures(Q_7_five_random_imgs)
 
-plot_graph_with_classify(Q_7_five_random_imgs, Q_7_classified_res)
+Q_7_real_res = list(map(lambda idx: sign_names[int(shuffled_test_labels[idx])], Q_7_five_random_idx))
+
+plot_graph_with_classify(Q_7_five_random_imgs, Q_7_classified_res, Q_7_real_res)
 ```
 
-    /Users/seanhuang/anaconda3/lib/python3.5/site-packages/ipykernel/__main__.py:38: VisibleDeprecationWarning: converting an array with ndim > 0 to an index will result in an error in the future
 
-
-
-![png](output_34_1.png)
+![png](output_35_0.png)
 
 
 ### Question 8
@@ -1111,13 +1137,15 @@ plot_graph_with_classify(Q_7_five_random_imgs, Q_7_classified_res)
 we can input k = 5 into the **eval_pictures** function with the same random pictures from Q7. Below we plot each graph together with its classification confident level. The result shows for each graph and its classification the cofident level for the top pick catagory is higher than the other catagories.  
 
 
+Also, as we can see for the 4th image, the classifier rate the correct sign as the second highest in its confident level, which might result by lack of detail within the picture or the light condition
+
+
 ```python
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 %matplotlib inline
 
 fig = plt.figure()
-
 
 Q_8_classified_res = eval_pictures(Q_7_five_random_imgs, 5)
 
@@ -1156,14 +1184,14 @@ the_table = ax.table(cellText=data, colLabels=col_name, rowLabels = row_name, lo
 ```
 
 
-![png](output_36_0.png)
+![png](output_37_0.png)
 
 
 ### Question 9
 _If necessary, provide documentation for how an interface was built for your model to load and classify newly-acquired images._
 
 
-**A:** We obainted some other traffic sign pictures(jpg format) from the internet. As we can see from the result, the model can classify signs with similar shape(e.g: "Do not enter") but the model fail on classify the shape that it never see before(e.g: "merge") in its training 
+**A:** We obainted some other traffic sign pictures(jpg format) from the internet. As we can see from the result, the model can classify signs with similar shape(p2). However, model fail on classify the shape that it've never see before in its training(p4), sign with extra structure(p3) or not align in center(p1, this might be fixed by adding extra preprocessing step). Therefore, such classifier need to be improve before it can be used in real world application
 
 
 ```python
@@ -1178,14 +1206,15 @@ for filename in glob.glob("*.jpg"):
     data = np.asarray( img )
     all_img.append(data)
 
+
 Q_9_classified_res = eval_pictures(all_img)
-plot_graph_with_classify(all_img, Q_9_classified_res)
+
+res=["30km/h","60kmh","no-enter", "stop"]
+
+plot_graph_with_classify(all_img, Q_9_classified_res, res)
 
 ```
 
-    /Users/seanhuang/anaconda3/lib/python3.5/site-packages/ipykernel/__main__.py:38: VisibleDeprecationWarning: converting an array with ndim > 0 to an index will result in an error in the future
 
-
-
-![png](output_38_1.png)
+![png](output_39_0.png)
 
