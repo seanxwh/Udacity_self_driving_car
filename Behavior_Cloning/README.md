@@ -1,8 +1,9 @@
 
 # Behavior Cloning
 
-## The model was tested using Dell XPS 8910 Desktop Intel Core i5-6400 Nvidia GTX1070 
-## Platform: Windows10 Simulation mode: 640*480 + Fantastic 
+### The model was tested using Dell XPS 8910 Desktop Intel Core i5-6400 Nvidia GTX1070 
+### Platform: Windows10 
+### Simulation mode: 640*480 + Fantastic 
 
 ### data/images helper functions
 
