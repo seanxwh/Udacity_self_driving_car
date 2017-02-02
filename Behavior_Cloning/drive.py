@@ -9,15 +9,11 @@ import eventlet
 import scipy
 import eventlet.wsgi
 import time
-from PIL import Image
-from PIL import ImageOps
+from PIL import Image, ImageOps
 from flask import Flask, render_template
 from io import BytesIO
-# from sys import maxint
 from keras.models import model_from_json
-from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array
 
-# Fix error with Keras and TensorFlow
 import tensorflow as tf
 tf.python.control_flow_ops = tf
 
@@ -38,17 +34,21 @@ def telemetry(sid, data):
     # The current image from the center camera of the car
     imgString = data["image"]
     image = Image.open(BytesIO(base64.b64decode(imgString)))
+
     image = np.asarray(image)
     shape = image.shape
     image = image[math.floor(shape[0]/3):shape[0]-25, 0:shape[1]]
     image = cv2.resize(image,(64,64),interpolation=cv2.INTER_AREA)
-    # resize_img = np.reshape(resize_img,  (-1, 80, 160, 3))/255.0
+
 
     transformed_image_array = image[None,:,:,:]
     transformed_speed_array = np.array([float(speed)])[None,:]
-    [[steering_angle]] = model.predict([transformed_image_array,transformed_speed_array],batch_size=1)
+    [[steering_angle]] = model.predict([transformed_image_array,
+                                        transformed_speed_array],
+                                        batch_size=1)
 
-
+    # the throttle value can be changed, such that the model can still predict
+    # the right angle
     throttle = 0.35
     print(steering_angle, throttle, float(speed))
 

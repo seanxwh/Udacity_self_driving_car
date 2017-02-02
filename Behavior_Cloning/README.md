@@ -1,9 +1,17 @@
 
 # Behavior Cloning
 
+### The model was tested using Dell XPS 8910 Desktop Intel Core i5-6400 Nvidia GTX1070
+
+### Platform: Windows10
+
+### Simulation mode: 640*480 + Fantastic
+
+### put Udacity tarck 1 data under ***data*** folder before run model.py
+
 ### data/images helper functions
 
-#### load modules 
+#### load modules
 
 
 ```python
@@ -23,8 +31,8 @@ These functions are mainly used for data loading, images argumentation, images c
 
 
 ```python
-# corp the top 1/3 and bottom 25 pixels from the image, then resize new 
-# image to 64*64 
+# corp the top 1/3 and bottom 25 pixels from the image, then resize new
+# image to 64*64
 def preprocess_img(image, new_size_col=64,new_size_row=64):
     image = np.asarray(image)
     shape = image.shape
@@ -34,7 +42,7 @@ def preprocess_img(image, new_size_col=64,new_size_row=64):
     return image
 
 
-# load images of different types from specificed path, and return turn 
+# load images of different types from specificed path, and return turn
 #the images array
 def imgs_preprocesses(file_paths, row):
     ary = []
@@ -58,42 +66,42 @@ def img_brightness_argumentation(img):
 
 def img_bluring_argumentation(img):
     img = np.asarray(img)
-    
-    # choose a random bluring index 
+
+    # choose a random bluring index
     rand_blur_idx = random.choice([3,5,7])
-    
+
     # decide whether we should use standard bluring on this step
-    img = (cv2.blur(img,(rand_blur_idx,rand_blur_idx)) 
+    img = (cv2.blur(img,(rand_blur_idx,rand_blur_idx))
            if random.randint(0,1)==1 else img)
-    
+
     # decide whether we should use Gaussian bluring on this step
-    img = (cv2.GaussianBlur(img,(rand_blur_idx,rand_blur_idx),0) 
+    img = (cv2.GaussianBlur(img,(rand_blur_idx,rand_blur_idx),0)
            if random.randint(0,1)==1 else img)
-    
+
     # decide whether we should use median bluring on this step
-    img = (cv2.medianBlur(img,rand_blur_idx) 
+    img = (cv2.medianBlur(img,rand_blur_idx)
            if random.randint(0,1)==1 else img)
     return img
 
 
-# this function is mainly used by training to generate various 
+# this function is mainly used by training to generate various
 # combination of image argumentation
 def img_argumentation(img):
     # decide whether we should use brightness arguementation on this step
-    arg_img = (img_brightness_argumentation(img) 
+    arg_img = (img_brightness_argumentation(img)
                if random.randint(0,1)==1 else img)
-    
+
     # decide whether we should use any bluring arguementation on this step
-    arg_img = (img_bluring_argumentation(arg_img) 
+    arg_img = (img_bluring_argumentation(arg_img)
                if random.randint(0,1)==1 else arg_img)
-    
+
     return arg_img
 ```
 
 
 ```python
 data_file = "./data/driving_log.csv"
-        
+
 # choose a random row of driving record from the CSV file  
 row = copier[random.randint(0, len(copier)-1)]
 
@@ -104,7 +112,7 @@ target_angl_data = [target_angl_data_cn]
 imgs = [img_cn] = imgs_preprocesses(camera_file_type,row)
 
 fliped_imgs = list(map(lambda img: np.fliplr(img), imgs[::]))
-fliped_target_angl_data = [-1*target_angl_data_cn] 
+fliped_target_angl_data = [-1*target_angl_data_cn]
 
 all_imgs = imgs+fliped_imgs
 all_steer_angl = target_angl_data+fliped_target_angl_data
@@ -152,9 +160,9 @@ for idx in range(16):
 
 if we look at the steering angle within the data that provided by Udacity, we can find that the data set itself is very unbalanced(see below) due to the game terrain, this will cause the error of generlizing. The situation worsen in our model, because we want to train the network using mean square error to predict continues steering angle instead of classified lables. These casue the optimizer to minimize error at the common driving senario (i.e: straight) and fail at other senario (i.e: sharp turn)  
 
-There are couple ways that can fix the issue. One can get more balance data, and train the network in a lager dataset, this will cause the training time to increase. The second method is to increse the steering angle porpotional to the by the one that output by the model, which in some sense will increse wobbling in driving straight line. 
+There are couple ways that can fix the issue. One can get more balance data, and train the network in a lager dataset, this will cause the training time to increase. The second method is to increse the steering angle porpotional to the by the one that output by the model, which in some sense will increse wobbling in driving straight line.
 
-In our case, we increse the steering angle 3 times comapre to the one output from model(refer to ***drive.py***). 
+In our case, we increse the steering angle 3 times comapre to the one output from model(refer to ***drive.py***).
 
 
 ```python
@@ -172,12 +180,12 @@ plt.show()
 
 
 ### The model
- This model is based on the nvidia paper, with addtional speed input layer and batch normalization 
- layers for the conv layers 
- reference: 
+ This model is based on the nvidia paper, with addtional speed input layer and batch normalization
+ layers for the conv layers
+ reference:
  http://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf
 
-#### loading Keras Modules 
+#### loading Keras Modules
 
 
 ```python
@@ -187,7 +195,7 @@ from keras.models import model_from_json
 
 from keras.layers import Input, Flatten, Dense, Lambda,\
                          Convolution2D, Dropout, merge
-                         
+
 from keras.layers.normalization import BatchNormalization
 
 from keras.layers.advanced_activations import ELU
@@ -196,12 +204,12 @@ from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 from keras.optimizers import Adam
 ```
 
-#### reload model & weights helper 
+#### reload model & weights helper
 
 
 ```python
 # this function is mainly used by continue training the network
-# that has been previous trained. One can do that by setting 
+# that has been previous trained. One can do that by setting
 # continue_training to True in main function
 def load_model_and_weights(model_json, model_file):
     json_file = open(model_json,'r')
@@ -216,20 +224,20 @@ def load_model_and_weights(model_json, model_file):
 
 
 ```python
-# This model is based on the nvidia paper, with addtional speed input layer and batch normalization 
-# layers for the conv layers 
-# reference: 
+# This model is based on the nvidia paper, with addtional speed input layer and batch normalization
+# layers for the conv layers
+# reference:
 # http://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf
 def model():
 
     images_input = Input(shape=(64, 64, 3))
-    
+
     # normalized each pixel within an input image  
     normalized_images_input = Lambda(lambda x: x/255.0,
                                     input_shape=(64, 64, 3),
                                     output_shape=(64, 64, 3),
-                                )(images_input) 
-    
+                                )(images_input)
+
     model_center = Convolution2D(
                             24, 5, 5,
                             subsample=(2, 2),
@@ -263,19 +271,19 @@ def model():
                             64, 3, 3,
                             subsample=(1, 1),
                             border_mode='valid')(model_center)
-    
-    # flattern out the img conv layer 
+
+    # flattern out the img conv layer
     model_center = Flatten()(model_center)
 
     # if we want to various speed for the car, we need to input the
-    # speed of the car, in order for it to perdict the right steer 
+    # speed of the car, in order for it to perdict the right steer
     # angle at different speed
     speed_input = Input(shape=(1,))
-    # normalized the input speed with the maximun speed allowed 
+    # normalized the input speed with the maximun speed allowed
     normalized_speed_input = Lambda(lambda x: x/30.19)(speed_input)
     model_speed = Dense(16)(normalized_speed_input)
 
-    # merge the flattened img conv layer with the speed layer, and 
+    # merge the flattened img conv layer with the speed layer, and
     # use those neuron as input to the final fully connected network
     merged = merge([model_center, model_speed], mode='concat')
 
@@ -294,15 +302,15 @@ def model():
     final_model = ELU()(final_model)
 
     final_model = Dense(1)(final_model)
-    
+
     # rescale the output by 25 times, since the output steering
-    # angle can vary between -25 to 25 
+    # angle can vary between -25 to 25
     final_model = Lambda(lambda x: x*25.0)(final_model)
-    
+
     return ([images_input, speed_input], final_model)
 ```
 
-#### model ploting 
+#### model ploting
 
 
 ```python
@@ -334,10 +342,10 @@ plt.imshow(img)
 
 ### conclusion
 
-The main takeaways that I've found on doing this project are: 
+The main takeaways that I've found on doing this project are:
 * neural network can be used to predict continues value as well rather than classification
 * unbalanced dataset can really hurt the performance of neural network, especially in predicting continues value
 
-Possible future imporvements 
+Possible future imporvements
 * generate a larger and more balance dataset for training
 * utilize the existing model, and the transfer learning to predict the model's throttle as well, so the NN can fully control the car (in our model, we can vary the throttle, and the car can still go thru the track)
