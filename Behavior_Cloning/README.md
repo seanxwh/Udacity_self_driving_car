@@ -1,6 +1,7 @@
 
 # Behavior Cloning
 
+<<<<<<< HEAD
 ### The model was tested using Dell XPS 8910 Desktop Intel Core i5-6400 Nvidia GTX1070
 
 ### Platform: Windows10
@@ -8,6 +9,11 @@
 ### Simulation mode: 640*480 + Fantastic
 
 ### put Udacity tarck 1 data under ***data*** folder before run model.py
+=======
+### The model was tested using Dell XPS 8910 Desktop Intel Core i5-6400 Nvidia GTX1070 
+### Platform: Windows10 
+### Simulation mode: 640*480 + Fantastic 
+>>>>>>> origin/master
 
 ### data/images helper functions
 
@@ -158,11 +164,15 @@ for idx in range(16):
 
 ### About the data
 
-if we look at the steering angle within the data that provided by Udacity, we can find that the data set itself is very unbalanced(see below) due to the game terrain, this will cause the error of generlizing. The situation worsen in our model, because we want to train the network using mean square error to predict continues steering angle instead of classified lables. These casue the optimizer to minimize error at the common driving senario (i.e: straight) and fail at other senario (i.e: sharp turn)  
+if we look at the steering angle within the data that provided by Udacity, we can find that the data set itself is very unbalanced(see below) due to the game terrain, this will cause the error of generlizing. The situation worsen in our model, because we want to train the network using mean square error to predict continues steering angle instead of classified lables. These casue the optimizer to minimize error at the common driving scenario (i.e: straight) and fail at other scenario (i.e: sharp turn)  
 
 There are couple ways that can fix the issue. One can get more balance data, and train the network in a lager dataset, this will cause the training time to increase. The second method is to increse the steering angle porpotional to the by the one that output by the model, which in some sense will increse wobbling in driving straight line.
 
+<<<<<<< HEAD
 In our case, we increse the steering angle 3 times comapre to the one output from model(refer to ***drive.py***).
+=======
+In our case, I incresed the steering angle 3 times comapre to the one output from model(refer to ***drive.py***). 
+>>>>>>> origin/master
 
 
 ```python
