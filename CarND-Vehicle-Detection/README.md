@@ -53,7 +53,7 @@ def save_data_to_path(data_path, data):
 
 ## Data Loading
 ----
- The data can be seperated as **vehicle** and **non-vehicle** objects, that data files can be downloaded in [vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [non-vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip). After download the zip files, extract the files under directry of **./test_images/**. Since we are using sklearn for the project which doesn't support GPU computation, we will limit the amount of training and testing data to prevent the features extraction and model prediction taking too long. 
+ The data can be seperated as **vehicle** and **non-vehicle** objects, that data files can be downloaded in [vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [non-vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip). After download the zip files, extract the files under directory of **./test_images/**. Since we are using sklearn for the project which doesn't support GPU computation, we will limit the amount of training and testing data to prevent the features extraction and model prediction taking too long. 
 
 
 ```python
@@ -100,17 +100,17 @@ print("total number of object labels {}".format(len(data_set_labels)))
 
 ## Image Features
 ----
-There are three types of image features that we care about in this project. There are spatial (resize), color histrogram, and Oriented Gradient (HOG) 
+There are three types of image features that we care about in this project. There are spatial (resize), color histogram, and Oriented Gradient (HOG) 
 
-The **bin_spatial** will return the smaller(32*32) size of the original picture(64*64) in a features vector, this effectly help to cutdown computation 
+The **bin_spatial** will return the smaller(32*32) size of the original picture(64*64) in a features vector, this efficiently help to cut down computation 
 
-The **color_histrogram** function basically give out the color(image channel) distribution according to the horizontal axis of the image(i.e how may same color pixel appear in the same bin column). In this case we use 32 bins(model image size:64*64) to repersent the distribution within each channel and then stack those bins within each channel together
+The **color_histrogram** function basically give out the color(image channel) distribution according to the horizontal axis of the image(i.e how may same color pixel appear in the same bin column). In this case we use 32 bins(model image size:64*64) to represent the distribution within each channel and then stack those bins within each channel together
 
 The **convert_clr** function is used to convert image from its original color space to a desire color space. In our case we convert the image from RGB space to the **YCrCb** space, because the **YCrCb** can help to extract HOG features 
 
 The main idea of Histogram of Oriented Gradient (HOG) is to compute the gradient information of how color changes within a channel with respect to different directions(i.e # orientations) within each patch(# cells * # pixels/cell)
 
-In our case, we found classiers that we will train later don't have a performance improvement as we increase the number of **orient** ,**cell_per_block** and **pix_per_cell**, but rather increase in processing time. Therefore we decide to keep those parameters as lecture suggested. However, as we stack all the HOG channels and use that for training our classifiers, we did see some improvement in classification. Therefore, we set **hog_channel="ALL"** 
+In our case, we found classifiers that we will train later don't have a performance improvement as we increase the number of **orient** ,**cell_per_block** and **pix_per_cell**, but rather increase in processing time. Therefore we decide to keep those parameters as lecture suggested. However, as we stack all the HOG channels and use that for training our classifiers, we did see some improvement in classification. Therefore, we set **hog_channel="ALL"** 
 
 
 
@@ -245,13 +245,13 @@ for idx, cat in enumerate(output_imgs):
 
 ## The model pipeline
 ---
-we create the model pipeline using the concatenation(horizontal) of above features, then stacking(vertical) them up for all the training examples, then utilize **StandardScaler** from **sklearn** to nomalize the incoming data
+we create the model pipeline using the concatenation(horizontal) of above features, then stacking(vertical) them up for all the training examples, then utilize **StandardScaler** from **sklearn** to normalize the incoming data
 
 During training, the model pipeline will generate a normalization base and the updated(after normalization) features of all the training examples. 
 
-During testing, the testing example can be normailized by the normalization base that provided from training via function's parameters passing. 
+During testing, the testing example can be normalized by the normalization base that provided from training via function's parameters passing. 
 
-we also include the argumentation method for training the model. The main raeson is even the impact of image argumentation is insignificant to the svc training, but linear SVC can not provide a good enough model for classification. Therefore, we also trained a neural network to jointly predict the classes, and one benifit for image argumentation is that it can help to prevent overfitting while training the neural network.  
+we also include the argumentation method for training the model. The main reason is even the impact of image argumentation is insignificant to the svc training, but linear SVC can not provide a good enough model for classification. Therefore, we also trained a neural network to jointly predict the classes, and one benefit for image argumentation is that it can help to prevent overfitting while training the neural network.  
 
 
 ```python
@@ -332,7 +332,7 @@ def model_pipeline(data, ttl_normalized_base=None, allow_fit=True):
     return ttl_normalized_base, ttl_normalized_features
 ```
 
-### load/save normalization base and nomalized features
+### load/save normalization base and normalized features
 
 
 ```python
@@ -458,21 +458,21 @@ for idx in range(n_predict):
 ![png](output_19_1.png)
 
 
-## Object indentification functions
+## Object identification functions
 
-Since our classifiers can only idetify which classes an image belong to, by using the corresponding feature vector from image. If an image contains mutiple objects of interest. One can use sliding window technique to take patches of the image and feed those patches to the classifier, to identify what class each patch belongs to. 
+Since our classifiers can only identify which classes an image belong to, by using the corresponding feature vector from image. If an image contains multiple objects of interest. One can use sliding window technique to take patches of the image and feed those patches to the classifier, to identify what class each patch belongs to. 
 
 pros and cons for sliding window technique
 **Pro**: easy to implement
 **Con**: take a long time to classify every patch within the image, if the patch size is small, but image size is big. 
 
-Therefore, we select only a portion of the image to apply the sliding window technique. In our case we choose the image region from **ystart=350** and **ystop=656** in the y-axis of the image. We did this selection because objects that we want to classified within the image mostly occour in that y value range 
+Therefore, we select only a portion of the image to apply the sliding window technique. In our case we choose the image region from **ystart=350** and **ystop=656** in the y-axis of the image. We did this selection because objects that we want to classified within the image mostly occur in that y value range 
 
 There are three main functions in here
 
-**find_cars**: scale a region of interest(area that vehicle/non-vehicle appear offen) and then apply the features extraction as above, by going thru the region using sliding windows and classify each window, one can draw boex and record the coordinates of that box if a window has been classified as vehicle
+**find_cars**: scale a region of interest(area that vehicle/non-vehicle appear often) and then apply the features extraction as above, by going thru the region using sliding windows and classify each window, one can draw boxes and record the coordinates of that box if a window has been classified as vehicle
 
-**heatmap**: due to the fact that find_car might re-draw many duplicate region becasue of the silid window technique, one can use heatmap(add 1 to an area) on the identified area from coordinates that mentioned above then apply a threshold to filter out a region
+**heatmap**: due to the fact that find_car might re-draw many duplicate region because of the slide window technique, one can use heatmap(add 1 to an area) on the identified area from coordinates that mentioned above then apply a threshold to filter out a region
 
 **draw_box**: draw a box on the region that the heatmap identified
 
@@ -587,7 +587,7 @@ def draw_labeled_bboxes(img, labels):
 
 ## Image/Video Process Pipeline
 ----
-we tried multiple value of **scale** and **threshold**, and we found the classifiers perform the best while we maintain the image scale. And the **threshold=4** help us to reduce false postive within the heatmap while maintain objects that we want to detect   
+we tried multiple value of **scale** and **threshold**, and we found the classifiers perform the best while we maintain the image scale. And the **threshold=4** help us to reduce false positive within the heatmap while maintain objects that we want to detect   
 
 
 ```python
@@ -676,8 +676,8 @@ processed_clip = clip1.fl_image(video_process_pipeline) #NOTE: this function exp
 
 ## Conclusions:
 ----
-This project we untilzed multiple feature vectors, linear SVM&NN classifiers together with some image manipulation techniques(sliding window & heatmap) to identify objects within an image.
+This project we utilized multiple feature vectors, linear SVM&NN classifiers together with some image manipulation techniques(sliding window & heatmap) to identify objects within an image.
 
-The pipeline can identify objects within a image most of the time, however, it also generates some false postives, which might due to the limited trainig size, and overfitting of the models. Also, due to the nature of we applying threshold on an image to filter false positive, the ground truth boxes usuually cannot correctly contain the objects it identiify
+The pipeline can identify objects within a image most of the time, however, it also generates some false positives, which might due to the limited training size, and overfitting of the models. Also, due to the nature of we applying threshold on an image to filter false positive, the ground truth boxes usually cannot correctly contain the objects it identify
 
-While the project is easy to understand and implemented, it suffers from many drawbacks such as problem that mention above, togehter with the fact that the whole pipeline cannot process video stream in real time, which might be essential for self driving vehicles. In order to build a better pipeline, One should also consider techniques that utilize deep nerual network(e.g: SSD, YOLO, etc) 
+While the project is easy to understand and implemented, it suffers from many drawbacks such as problem that mention above, together with the fact that the whole pipeline cannot process video stream in real time, which might be essential for self driving vehicles. In order to build a better pipeline, One should also consider techniques that utilize deep neural network(e.g: SSD, YOLO, etc) 
