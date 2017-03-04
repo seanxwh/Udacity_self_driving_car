@@ -15,6 +15,8 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from skimage.feature import hog
+from sklearn.tree import DecisionTreeClassifier 
+from sklearn.neural_network import MLPClassifier
 from sklearn.svm import LinearSVC, SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -71,8 +73,8 @@ for image in non_vehicle_images_path:
     img = read_img(image)
     non_vehicle_imgs.append(img)
 
-# we only using 2000 vehicle and non-vehicle data 
-n_data = 2000 
+# we only using 3000 vehicle and non-vehicle data 
+n_data = 3500
 
 # random select vehicle and non-vehicle objects
 random_select_vehicle_imgs = random.sample(vehicle_imgs, n_data)
@@ -92,14 +94,41 @@ print("total number of object labels {}".format(len(data_set_labels)))
 
     total number of vehicles 8792
     total number of non-vehicles 8968
-    total number of object 4000
-    total number of object labels 4000
+    total number of object 7000
+    total number of object labels 7000
 
 
 ## Image Features
 ----
 There are three types of image features that we care about in this project. There are spatial (resize), color histrogram, and Oriented Gradient (HOG) 
 
+The **bin_spatial** will return the smaller(32*32) size of the original picture(64*64) in a features vector, this effectly help to cutdown computation 
+
+The **color_histrogram** function basically give out the color(image channel) distribution according to the horizontal axis of the image(i.e how may same color pixel appear in the same bin column). In this case we use 32 bins(model image size:64*64) to repersent the distribution within each channel and then stack those bins within each channel together
+
+The **convert_clr** function is used to convert image from its original color space to a desire color space. In our case we convert the image from RGB space to the **YCrCb** space, because the **YCrCb** can help to extract HOG features 
+
+The main idea of Histogram of Oriented Gradient (HOG) is to compute the gradient information of how color changes within a channel with respect to different directions(i.e # orientations) within each patch(# cells * # pixels/cell)
+
+In our case, we found classiers that we will train later don't have a performance improvement as we increase the number of **orient** ,**cell_per_block** and **pix_per_cell**, but rather increase in processing time. Therefore we decide to keep those parameters as lecture suggested. However, as we stack all the HOG channels and use that for training our classifiers, we did see some improvement in classification. Therefore, we set **hog_channel="ALL"** 
+
+
+
+
+
+### global parameters for features extraction  
+These parameter are mostly for tuning the model 
+
+
+```python
+cspace='YCrCb'
+spatial_size=(32, 32)
+hist_bins=32
+orient = 9
+pix_per_cell = 8
+cell_per_block = 2
+hog_channel = "ALL" 
+```
 
 
 ```python
@@ -124,6 +153,22 @@ def color_hist(img, nbins=32):
     return hist_features
 
 
+def convert_clr(image, cspace='RGB'):
+    if cspace != 'RGB':
+        if cspace == 'HSV':
+            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+        elif cspace == 'LUV':
+            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2LUV)
+        elif cspace == 'HLS':
+            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+        elif cspace == 'YUV':
+            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
+        elif cspace == 'YCrCb':
+            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
+
+    else: feature_image = np.copy(image)     
+    return feature_image
+
 # Define a function to return HOG features and visualization
 def get_hog_features(img, orient, pix_per_cell, cell_per_block, vis=False, feature_vec=True):
     if vis == True:
@@ -136,12 +181,7 @@ def get_hog_features(img, orient, pix_per_cell, cell_per_block, vis=False, featu
                        cells_per_block=(cell_per_block, cell_per_block), transform_sqrt=False, 
                        visualise=False, feature_vector=feature_vec)
         return features
-```
 
-### some extra features helper functions 
-
-
-```python
 #extract HOG of image from specified channel(s)
 def extract_hog_features(feature_image, orient=9, 
                         pix_per_cell=8, cell_per_block=2, hog_channel=0):
@@ -159,37 +199,6 @@ def extract_hog_features(feature_image, orient=9,
                     pix_per_cell, cell_per_block, vis=False, feature_vec=True)
    
     return np.array(hog_features)
-
-
-def convert_clr(image, cspace='RGB'):
-    if cspace != 'RGB':
-        if cspace == 'HSV':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        elif cspace == 'LUV':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2LUV)
-        elif cspace == 'HLS':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
-        elif cspace == 'YUV':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
-        elif cspace == 'YCrCb':
-            feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
-
-    else: feature_image = np.copy(image)     
-    return feature_image
-```
-
-### global parameters for features extraction  
-These parameter are mostly for tuning the model 
-
-
-```python
-cspace='YCrCb'
-spatial_size=(32, 32)
-hist_bins=32
-orient = 12
-pix_per_cell = 8
-cell_per_block = 2
-hog_channel = "ALL" 
 ```
 
 ### tesing HOG features function
@@ -231,7 +240,7 @@ for idx, cat in enumerate(output_imgs):
 ```
 
 
-![png](output_14_0.png)
+![png](output_12_0.png)
 
 
 ## The model pipeline
@@ -240,21 +249,66 @@ we create the model pipeline using the concatenation(horizontal) of above featur
 
 During training, the model pipeline will generate a normalization base and the updated(after normalization) features of all the training examples. 
 
-During testing, the testing example can either normailized by the normalization base from training, or it can be normalized by using normalization base that generate from both train and testing set. 
+During testing, the testing example can be normailized by the normalization base that provided from training via function's parameters passing. 
 
-Strickly speaking, one should not generate new normalization base from testing, but only use nomrnalization base from training. In our case, the reason to use the new normalization base is that one can utilize the both train and test data are different from the one we use in the real image from the video stream, and also the dataset we use is relatively small
-
-Also, we tested the video stream with two normalization bases, the performace impact is insinificant 
-
-The above functionality is achieved by using the **partial_fit** method within **StandardScaler**
+we also include the argumentation method for training the model. The main raeson is even the impact of image argumentation is insignificant to the svc training, but linear SVC can not provide a good enough model for classification. Therefore, we also trained a neural network to jointly predict the classes, and one benifit for image argumentation is that it can help to prevent overfitting while training the neural network.  
 
 
 ```python
-def model_pipeline(data,ttl_normalized_base=None, allow_partial_fit=True):
+def img_brightness_argumentation(img):
+    img = np.asarray(img)
+    hsv_img = cv2.cvtColor(img,cv2.COLOR_RGB2HSV)
+    random_bright = .35+np.random.uniform()
+    hsv_img[:,:,2] = hsv_img[:,:,2]*random_bright
+    return cv2.cvtColor(hsv_img,cv2.COLOR_HSV2RGB)
+
+
+def img_bluring_argumentation(img):
+    img = np.asarray(img)
+
+    # choose a random bluring index
+    rand_blur_idx = random.choice([3,5,7])
+
+    # decide whether we should use standard bluring on this step
+    img = (cv2.blur(img,(rand_blur_idx,rand_blur_idx))
+           if random.randint(0,1)==1 else img)
+
+    # decide whether we should use Gaussian bluring on this step
+    img = (cv2.GaussianBlur(img,(rand_blur_idx,rand_blur_idx),0)
+           if random.randint(0,1)==1 else img)
+
+    # decide whether we should use median bluring on this step
+    img = (cv2.medianBlur(img,rand_blur_idx)
+           if random.randint(0,1)==1 else img)
+    return img
+
+
+# this function is mainly used by training to generate various
+# combination of image argumentation
+def img_argumentation(img):
+    # decide whether we should use brightness arguementation on this step
+    arg_img = (img_brightness_argumentation(img)
+               if random.randint(0,1)==1 else img)
+
+    # decide whether we should use any bluring arguementation on this step
+    arg_img = (img_bluring_argumentation(arg_img)
+               if random.randint(0,1)==1 else arg_img)
+
+    return arg_img
+```
+
+
+```python
+def model_pipeline(data, ttl_normalized_base=None, allow_fit=True):
     
     ttl_fts = None
 
+    if not (ttl_normalized_base):
+        ttl_normalized_base = StandardScaler()
+        
     for idx, obj in enumerate(data):
+    
+        obj = img_argumentation(obj) if random.choice(range(10))<=1 else obj
         
         feature_image = convert_clr(obj, cspace)
                         
@@ -263,17 +317,16 @@ def model_pipeline(data,ttl_normalized_base=None, allow_partial_fit=True):
         hist_ft = color_hist(feature_image, nbins=hist_bins)
         
         HOG_ft = extract_hog_features(feature_image, orient, pix_per_cell, cell_per_block, hog_channel)
-        
+                
         ttl_ft = np.hstack((spatial_ft, hist_ft, HOG_ft))
-
+        
         ttl_fts = np.vstack((ttl_fts,ttl_ft)).astype(np.float64) if idx>0 else ttl_ft.astype(np.float64)  
     
-    if not (ttl_normalized_base):
-        ttl_normalized_base = StandardScaler()
-    
-    if allow_partial_fit:
-        ttl_normalized_base = ttl_normalized_base.partial_fit(ttl_fts)
-    
+    if allow_fit:
+        
+        ttl_normalized_base = ttl_normalized_base.fit(ttl_fts)
+
+
     ttl_normalized_features = ttl_normalized_base.transform(ttl_fts)
     
     return ttl_normalized_base, ttl_normalized_features
@@ -312,7 +365,7 @@ except:
     
     
     train_normalized_base, train_normalized_features = model_pipeline(X_train)
-    test_normalized_base, test_normalized_features = model_pipeline(X_test, train_normalized_base)
+    test_normalized_base, test_normalized_features = model_pipeline(X_test, train_normalized_base, False)
     save_pipelined_data = [train_normalized_base, train_normalized_features,
                            test_normalized_base, test_normalized_features]
    
@@ -326,13 +379,13 @@ print("total number of training objects {}".format(len(X_train)))
 print("total number of testing objects {}".format(len(X_test)))
 ```
 
-    total number of training objects 3400
-    total number of testing objects 600
+    total number of training objects 5100
+    total number of testing objects 900
 
 
 ## Training Model
 -----
-In here, we train a linear SVC model to classified vehicle and non-vehicle objects. 
+In here, we train a linear SVC together with a 3 layers Neural Network(nn) to jointly classified vehicle and non-vehicle objects. 
 
 
 
@@ -340,25 +393,38 @@ In here, we train a linear SVC model to classified vehicle and non-vehicle objec
 %matplotlib inline
 
 svc_path = './svc_model'
+nn_path = './nn_model'
 
 t=time.time()
 
 try:
     svc = load_saved_data(svc_path)
+    nn = load_saved_data(nn_path)
 except:
-    svc = LinearSVC()
+    svc = LinearSVC(C=5e-2, loss='hinge')
     svc.fit(train_normalized_features, y_train)
+    nn = MLPClassifier(hidden_layer_sizes=(256,128,16))
+    nn.fit(train_normalized_features, y_train)    
+    save_data_to_path(svc_path, svc)
+    save_data_to_path(nn_path, nn)
+
 
 t2 = time.time()
-print(round(t2-t, 2), 'Seconds to train SVC...')
-# Check the score of the SVC
+print(round(t2-t, 2), 'Seconds to train SVC nad NN...')
+
 print('Test Accuracy of SVC = ', round(svc.score(test_normalized_features, y_test), 4))
+print('Test Accuracy of Neural Network = ', round(nn.score(test_normalized_features, y_test), 4))
+
 # Check the prediction time for a single sample
 t=time.time()
 n_predict = 10
 n_prediction=svc.predict(test_normalized_features[0:n_predict])
+n_prediction_2=nn.predict(test_normalized_features[0:n_predict])
+
 n_truth=y_test[0:n_predict]
+
 print('SVC predicts: ',n_prediction )
+print('Neural Network predicts: ',n_prediction_2 )
 print('For these',n_predict, 'labels: ', n_truth)
 t2 = time.time()
 print(round(t2-t, 5), 'Seconds to predict', n_predict,'labels with SVC')
@@ -370,26 +436,37 @@ fig = plt.figure()
 for idx in range(n_predict):
     fig.add_subplot((idx)/5+1,5, idx+1)
     plt.axis('off')
-    plt.title("predict: {},\nactual: {}".format(eval_sign(n_prediction[idx]),
-                                                           eval_sign(n_truth[idx])),fontsize=6)
+    plt.title("svc predict: {},\nnn  predict: {},\nactual: {}".format(eval_sign(n_prediction[idx]),
+                                                                         eval_sign(n_prediction_2[idx]),
+                                                                         eval_sign(n_truth[idx])),fontsize=6)
     plt.imshow(X_test[idx])
     plt.subplots_adjust(left=0.05, right=0.9, top=1.2, bottom=0)
 
 
 ```
 
-    12.16 Seconds to train SVC...
-    Test Accuracy of SVC =  0.9967
-    SVC predicts:  [0 1 0 0 1 0 0 1 1 1]
-    For these 10 labels:  [0, 1, 0, 0, 1, 0, 0, 1, 1, 1]
-    0.01563 Seconds to predict 10 labels with SVC
+    0.05 Seconds to train SVC nad NN...
+    Test Accuracy of SVC =  0.9878
+    Test Accuracy of Neural Network =  0.9922
+    SVC predicts:  [1 1 1 0 1 0 1 1 1 1]
+    Neural Network predicts:  [1 1 1 0 1 0 1 1 1 1]
+    For these 10 labels:  [1, 1, 1, 0, 1, 0, 1, 1, 1, 1]
+    0.03125 Seconds to predict 10 labels with SVC
 
 
 
-![png](output_20_1.png)
+![png](output_19_1.png)
 
 
-## Object indentification function
+## Object indentification functions
+
+Since our classifiers can only idetify which classes an image belong to, by using the corresponding feature vector from image. If an image contains mutiple objects of interest. One can use sliding window technique to take patches of the image and feed those patches to the classifier, to identify what class each patch belongs to. 
+
+pros and cons for sliding window technique
+**Pro**: easy to implement
+**Con**: take a long time to classify every patch within the image, if the patch size is small, but image size is big. 
+
+Therefore, we select only a portion of the image to apply the sliding window technique. In our case we choose the image region from **ystart=350** and **ystop=656** in the y-axis of the image. We did this selection because objects that we want to classified within the image mostly occour in that y value range 
 
 There are three main functions in here
 
@@ -402,13 +479,13 @@ There are three main functions in here
 
 
 ```python
-def find_cars(img, ystart, ystop, scale, svc, X_scaler,
+def find_cars(img, ystart, ystop, scale, model1, model2, X_scaler,
               orient=orient, pix_per_cell=pix_per_cell, 
               cell_per_block=cell_per_block, spatial_size=spatial_size,
               hist_bins=hist_bins):
     
     draw_img = np.copy(img)
-    img = img.astype(np.float32)/255.0
+    img = img.astype(np.float32)/255
     img_tosearch = img[ystart:ystop,:,:]  
     bounding_boxes = []
     ctrans_tosearch = convert_clr(img_tosearch, 'YCrCb')
@@ -427,7 +504,7 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler,
     # 64 was the orginal sampling rate, with 8 cells and 8 pix per cell
     window = 64
     nblocks_per_window = (window // pix_per_cell)-1 
-    cells_per_step = 2  # Instead of overlap, define how many cells to step
+    cells_per_step = 2 # Instead of overlap, define how many cells to step
     nxsteps = (nxblocks - nblocks_per_window) // cells_per_step
     nysteps = (nyblocks - nblocks_per_window) // cells_per_step
     
@@ -445,7 +522,7 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler,
             hog_feat2 = hog2[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
             hog_feat3 = hog3[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
             hog_features = np.hstack((hog_feat1, hog_feat2, hog_feat3))
-
+            
             xleft = xpos*pix_per_cell
             ytop = ypos*pix_per_cell
 
@@ -457,11 +534,12 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler,
             hist_features = color_hist(subimg, nbins=hist_bins)
 
             # Scale features and make a prediction
-            test_features = X_scaler.transform(np.hstack((spatial_features, hist_features, hog_features)).reshape(1, -1))    
-            #test_features = X_scaler.transform(np.hstack((shape_feat, hist_feat)).reshape(1, -1))    
-            test_prediction = svc.predict(test_features)
-            
-            if test_prediction == 1:
+            test_features = X_scaler.transform(np.hstack((spatial_features, hist_features, hog_features)))    
+
+            model1_prediction = model1.predict(test_features)
+            model2_prediction = model2.predict(test_features)
+      
+            if model1_prediction==1 and model2_prediction==1:
                 xbox_left = np.int(xleft*scale)
                 ytop_draw = np.int(ytop*scale)
                 win_draw = np.int(window*scale)
@@ -469,7 +547,6 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler,
                 bounding_boxes.append(((xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart)))
 
     return draw_img,bounding_boxes
-
 
 
 
@@ -510,18 +587,20 @@ def draw_labeled_bboxes(img, labels):
 
 ## Image/Video Process Pipeline
 ----
+we tried multiple value of **scale** and **threshold**, and we found the classifiers perform the best while we maintain the image scale. And the **threshold=4** help us to reduce false postive within the heatmap while maintain objects that we want to detect   
 
 
 ```python
-def image_process_pipeline(image, svc=svc, model_scaler=train_normalized_base):
-    ystart = 400
+def image_process_pipeline(image, model1=svc, model2=nn,
+                           model_scaler=train_normalized_base):
+    ystart = 350
     ystop = 656
-    scale = 1.5
-    threshold = 0.015
+    scale = 1
+    threshold = 4
     
     heat = np.zeros_like(image[:,:,0]).astype(np.float)
 
-    _, bounding_boxes = find_cars(image, ystart, ystop, scale, svc, model_scaler)
+    int_draw_pic, bounding_boxes = find_cars(image, ystart, ystop, scale, model1, model2, model_scaler)
     
     heat = add_heat(heat, bounding_boxes)
     
@@ -533,10 +612,10 @@ def image_process_pipeline(image, svc=svc, model_scaler=train_normalized_base):
     
     draw_img = draw_labeled_bboxes(np.copy(image), labels)
     
-    return draw_img, heatmap
+    return draw_img, heatmap, int_draw_pic
 
 def video_process_pipeline(image):
-    img, _ =image_process_pipeline(image)
+    img, _, _ =image_process_pipeline(image)
     return img
 ```
 
@@ -546,45 +625,43 @@ def video_process_pipeline(image):
 ```python
 %matplotlib inline
 test_images_path = glob.glob('./test_images/*.jpg')
-titles = ["oringinal", "detected boxes" , "heat map"]
+titles = ["oringinal","initial boxes", "heat map", "detected boxes"]
 
 for ix, path in enumerate(test_images_path):
     image = read_img(path)
-    draw_img, heatmap = image_process_pipeline(image)
-    imgs = [image, draw_img, heatmap]
+    draw_img, heatmap,int_draw_pic = image_process_pipeline(image)
+    imgs = [image, int_draw_pic, heatmap, draw_img]
     fig = plt.figure()
     for ix2, img in enumerate(imgs):
-        fig.add_subplot(ix+1, 3, ix2+1)
+        fig.add_subplot(ix+1, 4, ix2+1)
         plt.axis('off')
         plt.title(titles[ix2])
         plt.imshow(img)
         plt.subplots_adjust(left=0.1, right=0.9, top=1.2, bottom=0)
-
-
 ```
 
 
-![png](output_26_0.png)
+![png](output_25_0.png)
 
 
 
-![png](output_26_1.png)
+![png](output_25_1.png)
 
 
 
-![png](output_26_2.png)
+![png](output_25_2.png)
 
 
 
-![png](output_26_3.png)
+![png](output_25_3.png)
 
 
 
-![png](output_26_4.png)
+![png](output_25_4.png)
 
 
 
-![png](output_26_5.png)
+![png](output_25_5.png)
 
 
 ### test video pipeline
@@ -597,21 +674,10 @@ processed_clip = clip1.fl_image(video_process_pipeline) #NOTE: this function exp
 %time processed_clip.write_videofile(processed_output, audio=False)
 ```
 
-    [MoviePy] >>>> Building video output2.mp4
-    [MoviePy] Writing video output2.mp4
-
-
-    100%|█████████████████████████████████████████████████████████████████████████████▉| 1260/1261 [06:15<00:00,  3.37it/s]
-
-
-    [MoviePy] Done.
-    [MoviePy] >>>> Video ready: output2.mp4 
-    
-    Wall time: 6min 16s
-
-
 ## Conclusions:
 ----
-This project we untilzed multiple feature vectors, linear SVM classifier together with some image manipulation techniques to identify objects within an image. While the whole pipeline can identify objects within a image most of the time, the pipeline also fail on some cases,which might due to the limited trainig size. Also, due to the nature of we applying threshold on an image to filter false positive, the ground truth boxes usuually cannot correctly contain the objects it identiify
+This project we untilzed multiple feature vectors, linear SVM&NN classifiers together with some image manipulation techniques(sliding window & heatmap) to identify objects within an image.
 
-To build a better pipeline, One should also consider technique that utilize nerual network(e.g:SSD, YOLO) 
+The pipeline can identify objects within a image most of the time, however, it also generates some false postives, which might due to the limited trainig size, and overfitting of the models. Also, due to the nature of we applying threshold on an image to filter false positive, the ground truth boxes usuually cannot correctly contain the objects it identiify
+
+While the project is easy to understand and implemented, it suffers from many drawbacks such as problem that mention above, togehter with the fact that the whole pipeline cannot process video stream in real time, which might be essential for self driving vehicles. In order to build a better pipeline, One should also consider techniques that utilize deep nerual network(e.g: SSD, YOLO, etc) 
